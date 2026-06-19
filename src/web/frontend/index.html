@@ -1,0 +1,319 @@
+<!-- index.html -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>A1_Maze_Python</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; margin-top: 20px; }
+        canvas { border: 2px solid #2c3e50; margin-top: 20px; background: #fff; }
+        .controls {
+    display: flex;
+    flex-direction: row;          /* Секции идут ГОРИЗОНТАЛЬНО */
+    gap: 30px;                    /* Расстояние между секциями */
+    align-items: center;          /* Выровнять по вертикали */
+    justify-content: center;      /* Центрировать всё по горизонтали */
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #f8f9fa;          /* фон для группы */
+    border-radius: 10px;
+}
+
+.input-section,
+.generate-section,
+.file-section {
+    display: flex;
+    flex-direction: column;       /* Элементы идут ВЕРТИКАЛЬНО */
+    gap: 10px;                    /* Отступ между элементами */
+    align-items: stretch;         /* Растянуть элементы на всю ширину секции */
+}
+
+/* Разделители между секциями (визуально) */
+.generate-section,
+.file-section {
+    padding-left: 30px;
+    border-left: 2px solid #ddd;  /* Вертикальная линия-разделитель */
+}
+
+/* Стили полей ввода */
+.input-section label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 500;
+}
+
+.input-section input {
+    width: 70px;
+    padding: 5px 8px;
+    border: 2px solid #2c3e50;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+/* Общие стили для всех кнопок */
+.controls button {
+    padding: 10px 20px;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.3s;
+    white-space: nowrap;
+}
+
+/* Цвета кнопок */
+.btn-maze {
+    background: #2c3e50;
+}
+
+.btn-move {
+    background: #2c3e50;
+}
+
+.btn-import {
+    background: #27ae60;
+}
+
+.btn-export {
+    background: #2980b9;
+}
+
+/* Эффекты при наведении */
+.btn-maze:hover { background: #34495e; }
+.btn-import:hover { background: #2ecc71; }
+.btn-export:hover { background: #3498db; }
+
+/* Лёгкое "приподнимание" при наведении */
+.controls button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+        input { width: 60px; padding: 5px; }
+        button { padding: 8px 16px; background: #2c3e50; color: white; border: none; cursor: pointer; }
+        button:hover { background: #34495e; }
+    </style>
+</head>
+<body>
+    <h1>Генератор лабиринта (Алгоритм Эллера)</h1>
+
+    <div class="controls">
+    <div class="input-section">
+        <label>Высота: <input type="number" id="height" value="15" min="2" max="50"></label>
+        <label>Ширина: <input type="number" id="width" value="15" min="2" max="50"></label>
+    </div>
+
+    <div class="generate-section">
+        <button class="btn-maze" onclick="fetchAndDraw()">Генерация лабиринта</button>
+        <button class="btn-move">Решение лабиринта</button>
+    </div>
+
+    <div class="file-section">
+        <button class="btn-import" onclick="importMaze()">Импорт</button>
+        <button class="btn-export" onclick="exportMaze()">Экспорт</button>
+        <input type="file" id="fileInput" accept=".txt" style="display: none;">
+    </div>
+</div>
+
+    <canvas id="mazeCanvas" width="500" height="500"></canvas>
+
+    <script>
+        const MIN_MAZE_SIZE = 2;
+        const MAX_MAZE_SIZE = 50;
+
+        let currentMaze = null
+
+        async function fetchAndDraw() {
+            const w = document.getElementById('width').value;
+            const h = document.getElementById('height').value;
+
+            const response = await fetch(`http://127.0.0.1:8000/generate?width=${w}&height=${h}`);
+            const data = await response.json();
+            currentMaze = data
+            drawMaze(data);
+        }
+
+        function drawMaze(data) {
+            // console.log("==start drawing")
+            // console.log("data = ", data)
+            const canvas = document.getElementById('mazeCanvas');
+            const ctx = canvas.getContext('2d');
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // console.log("canvas.width =", canvas.width, "canvas.height =", canvas.height)
+            // console.log("data.width =", data.width, "data.height =", data.height)
+            const cellW = canvas.width / data.width;
+            const cellH = canvas.height / data.height;
+            // console.log("cellW =", cellW, "cellH =", cellH)
+
+            ctx.strokeStyle = "black";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+
+            ctx.rect(0, 0, canvas.width, canvas.height);
+
+            for (let r = 0; r < data.height; r++) {
+                for (let c = 0; c < data.width; c++) {
+                    if (data.wall_v[r][c] === 1) {
+                        const x = (c + 1) * cellW;
+                        const y1 = r * cellH;
+                        const y2 = (r + 1) * cellH;
+                        ctx.moveTo(x, y1);
+                        ctx.lineTo(x, y2);
+                    }
+                    // Горизонтальная стена снизу
+                    if (data.wall_h[r][c] === 1) {
+                        const y = (r + 1) * cellH;
+                        const x1 = c * cellW;
+                        const x2 = (c + 1) * cellW;
+                        ctx.moveTo(x1, y);
+                        ctx.lineTo(x2, y);
+                    }
+                }
+            }
+            ctx.stroke();
+        }
+
+        function importMaze() {
+
+            document.getElementById('fileInput').click();
+        }
+
+    document.getElementById('fileInput').addEventListener('change', async function(event) {
+    const file = event.target.files[0];
+
+    if (!file) return;
+
+    if (!file.name.endsWith('.txt')) {
+        alert("Пожалуйста, выберите .txt файл");
+        return;
+    }
+
+    try {
+
+        const text = await file.text();
+
+        const mazeData = parseMazeFile(text);
+        console.log("Парсинг лабиринта")
+        currentMaze = mazeData;
+        drawMaze(mazeData);
+
+        document.getElementById('width').value = mazeData.width;
+        document.getElementById('height').value = mazeData.height;
+
+        alert(`Импортирован лабиринт ${mazeData.width}x${mazeData.height}`);
+
+    } catch (error) {
+        alert(`Ошибка при чтении файла: ${error.message}`);
+    }
+
+    event.target.value = '';
+});
+
+    function parseMazeFile(text) {
+    const lines = text.split('\n').map(line => line.trim()).filter(line => line !== '');
+
+     const [heightStr, widthStr] = lines[0].split(/\s+/);
+    const height = parseInt(heightStr);
+    const width = parseInt(widthStr);
+
+    if (isNaN(width) || isNaN(height) || width <= 0 || height <= 0) {
+        throw new Error("Неверный формат размеров в первой строке");
+    }
+
+    if (width < MIN_MAZE_SIZE || width > MAX_MAZE_SIZE) {
+        throw new Error(`Ширина должна быть от ${MIN_MAZE_SIZE} до ${MAX_MAZE_SIZE}. Получено: ${width}`);
+    }
+
+    if (height < MIN_MAZE_SIZE || height > MAX_MAZE_SIZE) {
+        throw new Error(`Высота должна быть от ${MIN_MAZE_SIZE} до ${MAX_MAZE_SIZE}. Получено: ${height}`);
+    }
+
+    const wall_v = [];
+    for (let i = 0; i < height; i++) {
+        const lineIndex = i + 1;
+        const values = lines[lineIndex].split(/\s+/).map(Number);
+
+        if (values.length !== width) {
+            throw new Error(`Строка ${lineIndex + 1}: ожидалось ${width} значений, получено ${values.length}`);
+        }
+         if (values.some(v => v !== 0 && v !== 1)) {
+            throw new Error(`Строка ${lineIndex + 1}: значения должны быть 0 или 1`);
+        }
+        wall_v.push(values);
+    }
+
+    const wall_h = [];
+    const startH = height + 1;
+
+    for (let i = 0; i < height; i++) {
+        const lineIndex = startH + i;
+        if (lineIndex >= lines.length) {
+            throw new Error("Файл обрывается: не хватает данных wall_h");
+        }
+        const values = lines[lineIndex].split(/\s+/).map(Number);
+
+        if (values.length !== width) {
+            throw new Error(`Строка wall_h: ожидалось ${width} значений, получено ${values.length}`);
+        }
+        if (values.some(v => v !== 0 && v !== 1)) {
+            throw new Error(`Строка wall_h ${i + 1}: значения должны быть 0 или 1`);
+        }
+        wall_h.push(values);
+    }
+
+    return { width, height, wall_v, wall_h };
+}
+
+    async function exportMaze(){
+            console.log("func exportMaze")
+            if (!currentMaze){
+                console.log("Лабиринт не сгенерирован");
+                alert("Сгенерируйте лабиринт")
+                return;
+            }
+            try {
+
+            const response = await fetch('http://127.0.0.1:8000/export', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(currentMaze)
+        });
+
+        if (!response.ok) {
+            throw new Error(`Ошибка сервера: ${response.status}`);
+        }
+
+        const blob = await response.blob();
+
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+
+        const now = new Date();
+        const pad = (n) => n.toString().padStart(2, '0');
+        const timeStr = `${now.getFullYear()}_${pad(now.getMonth() + 1)}_${pad(now.getDate())}_${pad(now.getHours())}_${pad(now.getMinutes())}_${pad(now.getSeconds())}`;
+        link.download = `maze_${timeStr}.txt`;
+
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        console.log(`Лабиринт экспортирован`);
+
+    } catch (error) {
+        alert(`Ошибка экспорта: ${error.message}`);
+        console.error(error);
+    }
+        }
+
+        // fetchAndDraw();
+    </script>
+</body>
+</html>
